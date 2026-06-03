@@ -7,15 +7,17 @@ A GitHub Action that imports and configures a GPG key for Git signing using [gpg
 
 ## Features
 
-- Import GPG keys in ASCII armored format (_optionally base64 encoded for CI environments_)
-- Configure local or global git signing settings
-- Preset GPG agent passphrase for non-interactive signing
-- Set key trust level
-- Select a specific key or subkey for signing via fingerprint
-- Override committer identity independently from the GPG key
-- Dry-run mode to preview changes without applying them
+- Import GPG keys in ASCII armored format (_optionally base64 encoded for CI environments_).
+- Configure local or global git signing settings.
+- Preset GPG agent passphrase for non-interactive signing.
+- Set key trust level.
+- Select a specific key or subkey for signing via fingerprint.
+- Override committer identity independently from the GPG key.
+- Dry-run mode to preview changes without applying them.
 
-## Generating a GPG Key
+## Exporting your GPG Key
+
+If you don't have a GPG key, follow GitHub's guide to [generate](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key) one.
 
 Export your GPG private key in ASCII armored format:
 
