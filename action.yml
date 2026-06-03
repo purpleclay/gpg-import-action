@@ -1,0 +1,75 @@
+name: GPG Import
+description: Import and configure a GPG key for Git signing using gpg-import
+author: purpleclay
+
+branding:
+  icon: lock
+  color: purple
+
+inputs:
+  version:
+    description: The version of gpg-import to install
+    required: false
+    default: latest
+  key:
+    description: The GPG private key to import
+    required: true
+  passphrase:
+    description: The passphrase for the GPG private key
+    required: false
+  fingerprint:
+    description: Select a specific key or subkey by fingerprint
+    required: false
+  trust-level:
+    description: Set the trust level for the imported key (1-5)
+    required: false
+  skip-git:
+    description: Skip git configuration after importing the key
+    required: false
+    default: "false"
+  git-global-config:
+    description: Apply git signing settings globally rather than locally
+    required: false
+    default: "false"
+  git-committer-name:
+    description: Override the git committer name
+    required: false
+  git-committer-email:
+    description: Override the git committer email
+    required: false
+  dry-run:
+    description: Preview changes without applying them
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install gpg-import
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(gh api repos/purpleclay/gpg-import/releases/latest --jq '.tag_name')
+        fi
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/purpleclay/gpg-import/main/scripts/install.sh)" -- -v "$VERSION"
+
+    - name: Import GPG key
+      shell: bash
+      env:
+        GPG_PRIVATE_KEY: ${{ inputs.key }}
+        GPG_PASSPHRASE: ${{ inputs.passphrase }}
+        GPG_FINGERPRINT: ${{ inputs.fingerprint }}
+        GPG_TRUST_LEVEL: ${{ inputs.trust-level }}
+        GPG_SKIP_GIT: ${{ inputs.skip-git }}
+        GPG_GIT_GLOBAL_CONFIG: ${{ inputs.git-global-config }}
+        GPG_GIT_COMMITTER_NAME: ${{ inputs.git-committer-name }}
+        GPG_GIT_COMMITTER_EMAIL: ${{ inputs.git-committer-email }}
+        GPG_DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        for var in GPG_PASSPHRASE GPG_FINGERPRINT GPG_TRUST_LEVEL GPG_GIT_COMMITTER_NAME GPG_GIT_COMMITTER_EMAIL; do
+          [ -z "${!var}" ] && unset "$var"
+        done
+        gpg-import
