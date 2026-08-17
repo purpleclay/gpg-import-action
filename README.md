@@ -67,15 +67,66 @@ Store the output as a repository secret (e.g. `GPG_PRIVATE_KEY`). If your key ha
 
 ## Inputs
 
-| Input                 | Description                                             | Required | Default  |
-| --------------------- | ------------------------------------------------------- | :------: | :------: |
-| `version`             | The version of gpg-import to install                    |    No    | `latest` |
-| `key`                 | The GPG private key to import                           |   Yes    |          |
-| `passphrase`          | The passphrase for the GPG private key                  |    No    |          |
-| `fingerprint`         | Select a specific key or subkey by fingerprint          |    No    |          |
-| `trust-level`         | Set the trust level for the imported key (`1`-`5`)      |    No    |          |
-| `skip-git`            | Skip git configuration after importing the key          |    No    | `false`  |
-| `git-global-config`   | Apply git signing settings globally rather than locally |    No    | `false`  |
-| `git-committer-name`  | Override the git committer name                         |    No    |          |
-| `git-committer-email` | Override the git committer email                        |    No    |          |
-| `dry-run`             | Preview changes without applying them                   |    No    | `false`  |
+See [action.yml](action.yml)
+
+```yaml
+- uses: purpleclay/gpg-import-action@v0
+  with:
+    # Version of gpg-import to download.
+    # Optional. Defaults to the version this action release was tested
+    # against, so pinning the action pins a known-good pairing.
+    version:
+
+    # GitHub token used to download the gpg-import release.
+    # Optional. Default is github.token
+    token:
+
+    # Verify the downloaded gpg-import checksum and attestation before
+    # execution. Requires gpg-import >= 0.10.0.
+    # Optional. Default is true
+    verify-attestation:
+
+    # The GPG private key to import.
+    # Required.
+    key:
+
+    # The passphrase for the GPG private key.
+    # Optional.
+    passphrase:
+
+    # Select a specific key or subkey by fingerprint.
+    # Optional.
+    fingerprint:
+
+    # Set the trust level for the imported key (1-5).
+    # Optional.
+    trust-level:
+
+    # Skip git configuration after importing the key.
+    # Optional. Default is false
+    skip-git:
+
+    # Apply git signing settings globally rather than locally.
+    # Optional. Default is false
+    git-global-config:
+
+    # Override the git committer name instead of using the value from the
+    # GPG key.
+    # Optional.
+    git-committer-name:
+
+    # Override the git committer email instead of using the value from the
+    # GPG key.
+    # Optional.
+    git-committer-email:
+
+    # Preview changes without applying them.
+    # Optional. Default is false
+    dry-run:
+```
+
+## Outputs
+
+| Output                | Description                               |
+| ---------------------- | ------------------------------------------ |
+| `gpg-import-version`  | The gpg-import version that was executed  |
