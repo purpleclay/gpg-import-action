@@ -1,5 +1,5 @@
 name: GPG Import
-description: Import and configure a GPG key for Git signing using gpg-import
+description: Import and configure GPG signing for git using gpg-import
 author: purpleclay
 
 branding:
@@ -8,9 +8,21 @@ branding:
 
 inputs:
   version:
-    description: The version of gpg-import to install
+    description: >-
+      Version of gpg-import to download. Defaults to the version this action
+      release was tested against.
     required: false
-    default: latest
+    default: ""
+  token:
+    description: GitHub token used to download the gpg-import release
+    required: false
+    default: ${{ github.token }}
+  verify-attestation:
+    description: >-
+      Verify the downloaded gpg-import checksum and attestation before
+      execution. Requires gpg-import >= 0.10.0.
+    required: false
+    default: "true"
   key:
     description: The GPG private key to import
     required: true
@@ -42,23 +54,97 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  gpg-import-version:
+    description: The gpg-import version that was executed
+    value: ${{ steps.download.outputs.version }}
+
 runs:
   using: composite
   steps:
-    - name: Install gpg-import
+    - name: Download gpg-import
+      id: download
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        REQUESTED_VERSION: ${{ inputs.version }}
+        VERIFY_ATTESTATION: ${{ inputs.verify-attestation }}
+        GH_TOKEN: ${{ inputs.token }}
       run: |
-        VERSION="${{ inputs.version }}"
-        if [ "$VERSION" = "latest" ]; then
-          VERSION=$(gh api repos/purpleclay/gpg-import/releases/latest --jq '.tag_name')
+        set -euo pipefail
+
+        # The known-good CLI version for this action release. Bumped (and
+        # re-tested) as part of cutting a new action version.
+        DEFAULT_VERSION="0.10.0"
+        version="${REQUESTED_VERSION:-$DEFAULT_VERSION}"
+
+        case "$(uname -s)/$(uname -m)" in
+          Linux/x86_64)   target="x86_64-unknown-linux-musl" ;;
+          Linux/aarch64)  target="aarch64-unknown-linux-musl" ;;
+          Darwin/x86_64)  target="x86_64-apple-darwin" ;;
+          Darwin/arm64)   target="aarch64-apple-darwin" ;;
+          *) echo "::error::unsupported runner platform: $(uname -s)/$(uname -m)"; exit 1 ;;
+        esac
+
+        archive="gpg-import-${version}-${target}.tar.gz"
+        # A unique directory per invocation — a shared, fixed path would
+        # collide (gh release download refuses to overwrite) if this action
+        # runs more than once in the same job.
+        workdir="$(mktemp -d "${RUNNER_TEMP}/gpg-import.XXXXXX")"
+        cd "${workdir}"
+
+        if [ "${VERIFY_ATTESTATION}" = "true" ]; then
+          # checksums.txt and attestations were only introduced in 0.10.0 —
+          # pinning an older version with verification left enabled fails
+          # closed here, rather than silently skipping the check.
+          gh release download "${version}" \
+            --repo purpleclay/gpg-import \
+            --pattern "${archive}" \
+            --pattern "checksums.txt"
+          echo "::notice::downloaded ${archive}"
+
+          # macOS has no sha256sum; shasum -a 256 is the portable equivalent.
+          checksum_bin="sha256sum"
+          [ "$(uname -s)" = "Darwin" ] && checksum_bin="shasum -a 256"
+          grep "  ${archive}\$" checksums.txt | ${checksum_bin} --check
+          echo "::notice::checksum verified for ${archive}"
+
+          attestation_json="$(gh attestation verify "${archive}" \
+            --repo purpleclay/gpg-import \
+            --signer-workflow purpleclay/release-workflows/.github/workflows/release-rust.yml \
+            --format json)"
+
+          # Every entry (not just the first) is searched for a subject
+          # matching the archive. jq -e requires exactly one match with a
+          # non-empty digest and signer, and fails the step (via set -e) on
+          # zero matches, ambiguous matches, or incomplete metadata.
+          attestation_match="$(printf '%s' "${attestation_json}" | jq -e -r --arg name "${archive}" '
+            [ .[] as $entry
+              | ($entry.verificationResult.statement.subject[]? | select(.name == $name)) as $subject
+              | {digest: $subject.digest.sha256, signer: $entry.verificationResult.signature.certificate.buildSignerURI}
+            ]
+            | if (length == 1) and (.[0].digest | length > 0) and (.[0].signer | length > 0)
+              then "\(.[0].digest)\t\(.[0].signer)"
+              else null
+              end
+          ')"
+          IFS=$'\t' read -r digest signer <<< "${attestation_match}"
+          echo "::notice::attestation verified for ${archive} (sha256:${digest}, signed by ${signer})"
+        else
+          gh release download "${version}" \
+            --repo purpleclay/gpg-import \
+            --pattern "${archive}"
+          echo "::notice::downloaded ${archive}"
         fi
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/purpleclay/gpg-import/main/scripts/install.sh)" -- -v "$VERSION"
+
+        tar -xzf "${archive}"
+        chmod +x gpg-import
+        echo "bin=${workdir}/gpg-import" >> "${GITHUB_OUTPUT}"
+        echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
     - name: Import GPG key
       shell: bash
       env:
+        BIN: ${{ steps.download.outputs.bin }}
         GPG_PRIVATE_KEY: ${{ inputs.key }}
         GPG_PASSPHRASE: ${{ inputs.passphrase }}
         GPG_FINGERPRINT: ${{ inputs.fingerprint }}
@@ -72,4 +158,4 @@ runs:
         for var in GPG_PASSPHRASE GPG_FINGERPRINT GPG_TRUST_LEVEL GPG_GIT_COMMITTER_NAME GPG_GIT_COMMITTER_EMAIL; do
           [ -z "${!var}" ] && unset "$var"
         done
-        gpg-import
+        "${BIN}"
