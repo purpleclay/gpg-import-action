@@ -11,6 +11,7 @@
 !flake.nix
 !LICENSE
 !README.md
+!RELEASE.md
 !typos.toml
 
 # Recurse through sub-directories applying the same patterns
