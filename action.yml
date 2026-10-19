@@ -62,7 +62,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Download gpg-import
+    - name: download_gpg_import
       id: download
       shell: bash
       env:
@@ -73,7 +73,10 @@ runs:
         set -euo pipefail
 
         # The known-good CLI version for this action release. Bumped (and
-        # re-tested) as part of cutting a new action version.
+        # re-tested) as part of cutting a new action version, so consumers
+        # pinning the action get a tested pairing by default.
+        #
+        # renovate: datasource=github-releases depName=purpleclay/gpg-import
         DEFAULT_VERSION="0.10.0"
         version="${REQUESTED_VERSION:-$DEFAULT_VERSION}"
 
@@ -141,7 +144,7 @@ runs:
         echo "bin=${workdir}/gpg-import" >> "${GITHUB_OUTPUT}"
         echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
-    - name: Import GPG key
+    - name: import_gpg_key
       shell: bash
       env:
         BIN: ${{ steps.download.outputs.bin }}
