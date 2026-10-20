@@ -57,7 +57,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # gh release create --verify-tag (below) only checks the tag
+          # release-note-action's --verify-tag (below) only checks the tag
           # exists — it says nothing about who signed it. Only "purpleclay"
           # is an authorized signer; fetch that key alone into an isolated
           # keyring so any successful verification can only mean this tag
@@ -71,48 +71,6 @@ jobs:
           fi
 
       - name: release_note
-        id: notes
-        uses: purpleclay/release-note-action@173903da3997acebdb2c04f3de707c7c4c1a283e # v0.3.1
-
-      - name: publish_release
-        id: publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
-          NOTES_FILE: ${{ steps.notes.outputs.release-note-path }}
-        run: |
-          set -euo pipefail
-          # `gh release view`'s "release not found" is free-text CLI wording
-          # from an unpinned, hosted-runner gh install — not a documented,
-          # stable interface. Query the REST API directly instead and branch
-          # on the HTTP status line, which is.
-          #
-          # Immutable releases mean an existing release for this tag can
-          # never be deleted or modified, complete or not — there is no
-          # recovery path here but a new tag (see "Fixing a bad release" in
-          # RELEASE.md). So existence is treated as done, not something to
-          # replace: no delete, ever, on this path.
-          #
-          # pipefail means gh api's non-zero exit on a 404 propagates out of
-          # the pipeline into the assignment; `|| true` swallows that so the
-          # case below can inspect $http_status instead of killing the script.
-          http_status="$(gh api -i "repos/${REPO}/releases/tags/${TAG}" 2>/dev/null | head -n1 | awk '{print $2}')" || true
-
-          case "$http_status" in
-            200)
-              echo "release for '$TAG' already exists; nothing to publish"
-              url=$(gh release view "$TAG" --json url --jq '.url')
-              ;;
-            404)
-              url=$(gh release create "$TAG" \
-                --title "$TAG" \
-                --notes-file "$NOTES_FILE" \
-                --verify-tag)
-              ;;
-            *)
-              echo "::error::could not confirm whether a release for '$TAG' already exists (HTTP ${http_status:-unknown})"
-              exit 1
-              ;;
-          esac
-          echo "url=${url}" >> "$GITHUB_OUTPUT"
+        uses: purpleclay/release-note-action@35a3b27b93d24ded4436b5266df8cccbbbe18d82 # v0.4.0
+        with:
+          publish: true
