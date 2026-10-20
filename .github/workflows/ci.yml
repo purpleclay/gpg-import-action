@@ -120,7 +120,7 @@ jobs:
 
       - name: run_action
         id: action
-        uses: ./
+        uses: $/
         with:
           key: ${{ steps.gpg.outputs.key }}
           passphrase: arkhamcity
