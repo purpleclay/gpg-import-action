@@ -1,5 +1,5 @@
 name: GPG Import
-description: Import and configure GPG signing for git using gpg-import
+description: Import a GPG key and configure git commit and tag signing, non-interactively, using gpg-import
 author: purpleclay
 
 branding:
@@ -44,15 +44,30 @@ inputs:
     required: false
     default: "false"
   git-committer-name:
-    description: Override the git committer name
+    description: >-
+      Override the git committer name instead of using the value from the
+      GPG key
     required: false
   git-committer-email:
-    description: Override the git committer email
+    description: >-
+      Override the git committer email. If it matches another uid on the GPG
+      key, that uid's name is used too
     required: false
   dry-run:
     description: Preview changes without applying them
     required: false
     default: "false"
+  skip-verify:
+    description: Skip the test signature that proves the imported key can sign
+    required: false
+    default: "false"
+  sign:
+    description: >-
+      The git operations to sign, comma separated: any of commits, tags and
+      pushes. Settings for the others are left as they are. Defaults to all
+      three.
+    required: false
+    default: ""
 
 outputs:
   gpg-import-version:
@@ -157,8 +172,11 @@ runs:
         GPG_GIT_COMMITTER_NAME: ${{ inputs.git-committer-name }}
         GPG_GIT_COMMITTER_EMAIL: ${{ inputs.git-committer-email }}
         GPG_DRY_RUN: ${{ inputs.dry-run }}
+        GPG_SKIP_VERIFY: ${{ inputs.skip-verify }}
+        GPG_SIGN: ${{ inputs.sign }}
       run: |
-        for var in GPG_PASSPHRASE GPG_FINGERPRINT GPG_TRUST_LEVEL GPG_GIT_COMMITTER_NAME GPG_GIT_COMMITTER_EMAIL; do
+        # The CLI rejects an empty GPG_SIGN, so unsetting it lets the CLI's own default apply.
+        for var in GPG_PASSPHRASE GPG_FINGERPRINT GPG_TRUST_LEVEL GPG_GIT_COMMITTER_NAME GPG_GIT_COMMITTER_EMAIL GPG_SIGN; do
           [ -z "${!var}" ] && unset "$var"
         done
         "${BIN}"

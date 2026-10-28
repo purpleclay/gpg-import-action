@@ -118,6 +118,28 @@ jobs:
             echo "GPG_KEY_EOF"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: run_action_sign_tags
+        uses: $/
+        with:
+          key: ${{ steps.gpg.outputs.key }}
+          passphrase: arkhamcity
+          sign: tags
+
+      - name: assert_sign_tags
+        run: |
+          set -euo pipefail
+          # Runs on a fresh checkout, so an unset key proves the action left
+          # it alone rather than writing false.
+          [ "$(git config --local --get tag.gpgsign)" = "true" ] || { echo "::error::tag.gpgsign was not set to true"; exit 1; }
+          for key in commit.gpgsign push.gpgsign; do
+            if git config --local --get "${key}"; then
+              echo "::error::${key} was set, expected it to be left unset by sign: tags"
+              exit 1
+            fi
+          done
+
+      # No sign input here: the CLI rejects an empty GPG_SIGN, so this step
+      # also checks that a blank input is unset rather than passed through.
       - name: run_action
         id: action
         uses: $/
@@ -156,3 +178,29 @@ jobs:
             git log --show-signature -1
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: run_action_wrong_passphrase
+        id: wrong_passphrase
+        continue-on-error: true
+        uses: $/
+        with:
+          key: ${{ steps.gpg.outputs.key }}
+          passphrase: joker
+
+      # Same wrong passphrase, so this only passes if skip-verify reaches the
+      # CLI and the test signature is skipped.
+      - name: run_action_skip_verify
+        uses: $/
+        with:
+          key: ${{ steps.gpg.outputs.key }}
+          passphrase: joker
+          skip-verify: true
+
+      - name: assert_wrong_passphrase_failed
+        env:
+          OUTCOME: ${{ steps.wrong_passphrase.outcome }}
+        run: |
+          if [ "${OUTCOME}" != "failure" ]; then
+            echo "::error::import with a wrong passphrase was '${OUTCOME}', expected the signing check to fail it"
+            exit 1
+          fi
